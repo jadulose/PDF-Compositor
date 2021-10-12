@@ -21,13 +21,18 @@ public:
     ~MainWindow() override;
 
 public slots:
+
     void addFile();
+
     void removeSelected();
+
     void clearAll();
+
     void composite();
 
 private:
     Ui::MainWindow *ui;
+    QString last_path{"."};
 };
 
 

@@ -7,7 +7,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QFileDialog>
-#include <filesystem>
 #include <iostream>
 #include <cstdlib>
 #include <QDesktopServices>
@@ -27,16 +26,29 @@ MainWindow::~MainWindow() {
     delete ui;
 }
 
+QString getFileName(const QString &file_path) {
+    for (auto i = file_path.length() - 1; i >= 0; --i)
+        if (file_path.at(i) == QChar('/') || file_path.at(i) == QChar('\\'))
+            return std::move(file_path.mid(i + 1));
+    return file_path;
+}
+
+QString getDirectory(const QString &file_path) {
+    for (auto i = file_path.length() - 1; i >= 0; --i)
+        if (file_path.at(i) == QChar('/') || file_path.at(i) == QChar('\\'))
+            return std::move(file_path.mid(0, i));
+    return file_path;
+}
+
 void MainWindow::addFile() {
-    QStringList files = QFileDialog::getOpenFileNames(this, "添加图片", ".", "图片格式 (*.png *.jpg)");
+    QStringList files = QFileDialog::getOpenFileNames(this, "添加图片", last_path, "图片格式 (*.png *.jpg)");
+    if (files.isEmpty()) return;
     for (const auto &file: files) {
-        std::filesystem::path file_path{file.toStdString()};
-        if (!exists(file_path))
-            continue;
-        auto *item = new QListWidgetItem(QIcon(file), QString::fromStdString(file_path.filename()), ui->listWidget);
+        auto *item = new QListWidgetItem(QIcon(file), getFileName(file), ui->listWidget);
         item->setToolTip(file);
         ui->listWidget->addItem(item);
     }
+    last_path = getDirectory(files[0]);
 }
 
 void MainWindow::removeSelected() {
@@ -53,7 +65,7 @@ void MainWindow::clearAll() {
 void MainWindow::composite() {
     int length = ui->listWidget->count();
     if (!length) return;
-    QString file = QFileDialog::getSaveFileName(this, "保存PDF", ".", "PDF格式 (*.pdf)");
+    QString file = QFileDialog::getSaveFileName(this, "保存PDF", last_path, "PDF格式 (*.pdf)");
     if (file.isEmpty()) return;
     std::string out_command{"convert \""};
     for (int i = 0; i < length; ++i) {
@@ -65,4 +77,3 @@ void MainWindow::composite() {
     system(out_command.c_str());
     QDesktopServices::openUrl(QUrl(QString::fromStdString(R"(file:)" + file.toStdString()), QUrl::TolerantMode));
 }
-
