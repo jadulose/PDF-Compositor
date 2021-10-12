@@ -41,7 +41,8 @@ QString getDirectory(const QString &file_path) {
 }
 
 void MainWindow::addFile() {
-    QStringList files = QFileDialog::getOpenFileNames(this, "添加图片", last_path, "图片格式 (*.png *.jpg)");
+    QStringList files = QFileDialog::getOpenFileNames(this, "添加图片", last_path,
+                                                      "图片格式 (*.png *.jpg *.gif *.bmp *.svg);;全部文件 (*.*)");
     if (files.isEmpty()) return;
     for (const auto &file: files) {
         auto *item = new QListWidgetItem(QIcon(file), getFileName(file), ui->listWidget);
@@ -69,11 +70,11 @@ void MainWindow::composite() {
     if (file.isEmpty()) return;
     std::string out_command{"convert \""};
     for (int i = 0; i < length; ++i) {
-        out_command.append(ui->listWidget->item(i)->toolTip().toStdString());
+        out_command.append(ui->listWidget->item(i)->toolTip().toLocal8Bit());
         out_command.append("\" \"");
     }
-    out_command.append(file.toStdString());
+    out_command.append(file.toLocal8Bit());
     out_command.append("\"");
     system(out_command.c_str());
-    QDesktopServices::openUrl(QUrl(QString::fromStdString(R"(file:)" + file.toStdString()), QUrl::TolerantMode));
+    QDesktopServices::openUrl(QUrl(QString("file:").append(file), QUrl::TolerantMode));
 }
