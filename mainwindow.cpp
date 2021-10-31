@@ -10,12 +10,11 @@
 #include <cstdlib>
 #include <QDesktopServices>
 #include <QScreen>
-#include <QDebug>
 #include <QDragEnterEvent>
 #include <QMimeData>
 #include <vector>
 #include <filesystem>
-#include <QUrl>
+#include <iostream>
 
 static const std::vector<std::string> AVAILABLE_FORMATS{".png", ".jpg", ".gif", ".bmp", ".svg"};
 
@@ -68,6 +67,13 @@ QString getDirectory(const QString &file_path) {
     for (auto i = file_path.length() - 1; i >= 0; --i)
         if (file_path.at(i) == QChar('/') || file_path.at(i) == QChar('\\'))
             return std::move(file_path.mid(0, i));
+    return file_path;
+}
+
+QString getExtension(const QString &file_path) {
+    for (auto i = file_path.length() - 1; i >= 0; --i)
+        if (file_path.at(i) == QChar('.'))
+            return std::move(file_path.mid(i));
     return file_path;
 }
 
@@ -159,6 +165,23 @@ void MainWindow::dropEvent(QDropEvent *event) {
     ui->statusbar->show();
     showMessage("丢入图片中...");
     ui->stackedWidget->setCurrentIndex(0);
+
+//    const QMimeData *mimeData = event->mimeData();
+//    if (mimeData->hasImage()) {
+//        qDebug() << "图片类型MimeData";
+//    } else if (mimeData->hasFormat(QLatin1String("text/markdown"))) {
+//        qDebug() << "text/markdown: " << QString::fromUtf8(mimeData->data(QLatin1String("text/markdown")));
+//    } else if (mimeData->hasHtml()) {
+//        qDebug() << "html类型MimeData";
+//    } else if (mimeData->hasText()) {
+//        qDebug() << "text类型：" << mimeData->text();
+//    } else if (mimeData->hasUrls()) {
+//        qDebug() << "url类型";
+//    } else {
+//        qDebug() << "无法显示类型";
+//    }
+//    qDebug() <<  mimeData->formats();
+
     auto *path_list = new QStringList();
     for (const auto &url: event->mimeData()->urls())
         path_list->append(url.path());
@@ -189,9 +212,9 @@ void MainWindow::slotCompositeFinished(QString *file) {
     if (file->isEmpty())
         showMessage("取消导出PDF", 1000);
     else
-        showMessage(QString("成功导出PDF：").append(file), 5000);
+        showMessage(QString("成功导出PDF：").append(*file), 5000);
     ui->pushButton_Composite->setEnabled(true);
-    QDesktopServices::openUrl(QUrl(QString("file:").append(file), QUrl::TolerantMode));
+    QDesktopServices::openUrl(QUrl(QString("file:").append(*file), QUrl::TolerantMode));
     delete file;
 }
 
@@ -201,21 +224,31 @@ FileAdder::FileAdder(MainWindow *father) : m_father{father} {
 void FileAdder::doWork(QStringList *path_list) {
     bool state = !path_list->isEmpty();
     for (const auto &path: *path_list) {
+//        std::cout << path.toStdString() << std::endl;
+//        std::cout << std::string(path.toLocal8Bit()) << std::endl;
+//        std::cout << p.string() << std::endl;
         // 当前这种方法不支持网络图片
-        std::filesystem::path p{std::string(path.toLocal8Bit())};
+#ifdef __GNUC__
+        std::filesystem::path p{path.toStdString()};
         if (!std::filesystem::exists(p)) continue;
-        if (std::filesystem::is_regular_file(p) && formats_contains(p.extension())) {
+        if (std::filesystem::is_regular_file(p) && formats_contains(p.extension().string())) {
             m_father->addFile(path);
-            m_father->setLastPath(QString::fromStdString(p.parent_path()));
+            m_father->setLastPath(QString::fromStdString(p.parent_path().string()));
         } else if (std::filesystem::is_directory(p)) {
             for (const auto &pp: std::filesystem::directory_iterator(p)) {
                 // 并不是recursive操作，只能添加一个文件夹
-                if (std::filesystem::is_regular_file(pp) && formats_contains(pp.path().extension())) {
-                    m_father->addFile(QString::fromStdString(pp.path()));
+                if (std::filesystem::is_regular_file(pp) && formats_contains(pp.path().extension().string())) {
+                    m_father->addFile(QString::fromStdString(pp.path().string()));
                 }
             }
-            m_father->setLastPath(QString::fromStdString(p));
+            m_father->setLastPath(QString::fromStdString(p.string()));
         }
+#else
+        if (formats_contains(getExtension(path.mid(1)).toStdString())) {
+            m_father->addFile(path.mid(1));
+            m_father->setLastPath(path.mid(1));
+        }
+#endif
     }
     delete path_list;
     emit resultReady(state);
@@ -234,6 +267,7 @@ void PDFCompositor::doWork(QString *output_path) {
         }
         out_command.append(output_path->toLocal8Bit());
         out_command.append("\"");
+        std::cout << out_command << std::endl;
         system(out_command.c_str());
     }
     emit resultReady(output_path);
