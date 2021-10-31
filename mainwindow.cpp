@@ -244,9 +244,10 @@ void FileAdder::doWork(QStringList *path_list) {
             m_father->setLastPath(QString::fromStdString(p.string()));
         }
 #else
-        if (formats_contains(getExtension(path.mid(1)).toStdString())) {
-            m_father->addFile(path.mid(1));
-            m_father->setLastPath(path.mid(1));
+        QString path_temp = path.at(0) == QChar('/') ? path.mid(1) : path;
+        if (formats_contains(getExtension(path_temp).toStdString())) {
+            m_father->addFile(path_temp);
+            m_father->setLastPath(path_temp);
         }
 #endif
     }
@@ -267,7 +268,6 @@ void PDFCompositor::doWork(QString *output_path) {
         }
         out_command.append(output_path->toLocal8Bit());
         out_command.append("\"");
-        std::cout << out_command << std::endl;
         system(out_command.c_str());
     }
     emit resultReady(output_path);
